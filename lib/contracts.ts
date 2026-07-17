@@ -8,6 +8,7 @@ export const IssueSchema = z.object({
   impact: z.enum(["Critical", "Serious", "Moderate"]),
   helps: z.string(),
   selector: z.string().optional(),
+  pageUrl: z.string().url().optional(),
   status: z.enum(["Found", "Verified", "Review"])
 });
 
@@ -24,7 +25,8 @@ export const PatchHandoffSchema = z.object({
   branch: z.string(),
   filesChanged: z.array(z.string()),
   diff: z.string(),
-  attempt: z.number().int().min(1).max(3)
+  attempt: z.number().int().min(1).max(3),
+  commitSha: z.string().optional()
 });
 
 export const VerdictSchema = z.object({

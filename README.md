@@ -22,6 +22,20 @@ The dashboard can be explored without credentials. To activate the full runtime,
 - Store screenshot evidence for every verified result.
 - If verification remains inconclusive after the configured retry limit, mark the issue for human review.
 
-## Next implementation increment
+## Controlled demo target
 
-The `POST /api/runs` endpoint is the worker handoff point. Connect it to Playwright + axe-core for screenshots, accessibility trees, and baseline violations; then call the OpenAI Responses API for visual audit and verification. Keep the patch and PR adapters server-side and require the environment values documented in `.env.example`.
+`/demo-target` is intentionally inaccessible and exists only for the live demo. It contains a missing image alternative, an unlabeled email input, insufficient text contrast, and a dialog without focus management. Do not use it as an implementation example.
+
+## Runtime boundary
+
+`POST /api/runs` creates a durable Inngest audit run. Playwright and axe-core create the baseline evidence, the OpenAI Responses API performs visual audit with a JSON Schema contract, and Supabase stores private evidence. The patch, verification, and PR adapters are server-side only and must run against a disposable repository/preview.
+
+## Deployment checklist
+
+1. Apply `supabase/migrations/001_initial.sql` in the Supabase SQL editor.
+2. Configure the environment values in `.env.example` in Vercel and Inngest.
+3. Connect the target repository to Vercel so every pushed AccessAgent branch receives a Preview Deployment.
+4. Configure `ACCESSAGENT_TEST_COMMAND` for the target repository.
+5. Deploy, then sync the `/api/inngest` endpoint with Inngest.
+
+The CI workflow installs Chromium before type-checking and building. Vercel Sandbox executes any agent-generated patch separately from the dashboard runtime.

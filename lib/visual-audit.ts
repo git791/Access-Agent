@@ -5,13 +5,16 @@ import { required } from "./config";
 
 const VisualIssueSchema = z.object({ title: z.string(), wcag: z.string(), impact: z.enum(["Critical", "Serious", "Moderate"]), helps: z.string(), selector: z.string().optional() });
 const VisualResultSchema = z.object({ issues: z.array(VisualIssueSchema) });
+const visualSchema = { type: "object", additionalProperties: false, required: ["issues"], properties: { issues: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "wcag", "impact", "helps"], properties: { title: { type: "string" }, wcag: { type: "string" }, impact: { type: "string", enum: ["Critical", "Serious", "Moderate"] }, helps: { type: "string" }, selector: { type: "string" } } } } } } as const;
+const verdictSchema = { type: "object", additionalProperties: false, required: ["resolved", "regression", "explanation"], properties: { resolved: { type: "boolean" }, regression: { type: "boolean" }, explanation: { type: "string" } } } as const;
 
 export async function inspectRenderedPage(screenshot: Buffer, accessibilityTree: string, staticIssues: Issue[]): Promise<Issue[]> {
   const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
   const prompt = `You are the visual accessibility auditor in a closed verification loop. Inspect the screenshot and accessibility tree. Flag only WCAG-relevant barriers missed by the provided axe findings. Return JSON: { issues: [{ title, wcag, impact: Critical|Serious|Moderate, helps, selector? }] }. Do not claim a fix or verification. Axe findings: ${JSON.stringify(staticIssues)}. Accessibility tree: ${accessibilityTree.slice(0, 12_000)}`;
   const response = await client.responses.create({
     model: process.env.OPENAI_VISION_MODEL || "gpt-5.4",
-    input: [{ role: "user", content: [{ type: "input_text", text: prompt }, { type: "input_image", image_url: `data:image/png;base64,${screenshot.toString("base64")}`, detail: "high" }] }]
+    input: [{ role: "user", content: [{ type: "input_text", text: prompt }, { type: "input_image", image_url: `data:image/png;base64,${screenshot.toString("base64")}`, detail: "high" }] }],
+    text: { format: { type: "json_schema", name: "visual_audit", strict: true, schema: visualSchema } }
   });
   const parsed = VisualResultSchema.safeParse(JSON.parse(response.output_text));
   if (!parsed.success) throw new Error("Visual auditor returned an invalid response.");
@@ -29,7 +32,8 @@ export async function verifyRenderedFix(before: Buffer, after: Buffer, issue: Is
       { type: "input_text", text: prompt },
       { type: "input_image", image_url: `data:image/png;base64,${before.toString("base64")}`, detail: "high" },
       { type: "input_image", image_url: `data:image/png;base64,${after.toString("base64")}`, detail: "high" }
-    ] }]
+    ] }],
+    text: { format: { type: "json_schema", name: "verification_verdict", strict: true, schema: verdictSchema } }
   });
   const parsed = VerdictResponseSchema.safeParse(JSON.parse(response.output_text));
   if (!parsed.success) throw new Error("Verification role returned an invalid verdict.");

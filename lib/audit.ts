@@ -18,15 +18,15 @@ function helps(rule: string) {
   return "People using assistive technology receive a more reliable experience.";
 }
 
-export async function crawlAndAudit(targetUrl: string, maxPages = 5): Promise<PageAudit[]> {
+export async function crawlAndAudit(targetUrl: string, maxPages = 5, maxDepth = 2): Promise<PageAudit[]> {
   const origin = new URL(targetUrl).origin;
   const browser = await chromium.launch({ headless: true });
   const seen = new Set<string>();
-  const queue = [targetUrl];
+  const queue = [{ url: targetUrl, depth: 0 }];
   const audits: PageAudit[] = [];
   try {
     while (queue.length && audits.length < maxPages) {
-      const url = queue.shift()!;
+      const { url, depth } = queue.shift()!;
       if (seen.has(url)) continue;
       seen.add(url);
       const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
@@ -46,7 +46,7 @@ export async function crawlAndAudit(targetUrl: string, maxPages = 5): Promise<Pa
       audits.push({ url, screenshotBase64: screenshot.toString("base64"), accessibilityTree, issues });
       const links = await page.locator("a[href]").evaluateAll((anchors) => anchors.map((a) => (a as HTMLAnchorElement).href));
       for (const href of links) {
-        try { if (new URL(href).origin === origin && !seen.has(href)) queue.push(href); } catch { /* ignore invalid links */ }
+        try { if (depth < maxDepth && new URL(href).origin === origin && !seen.has(href)) queue.push({ url: href, depth: depth + 1 }); } catch { /* ignore invalid links */ }
       }
       await page.close();
     }

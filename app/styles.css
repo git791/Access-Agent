@@ -9,3 +9,5 @@ main { max-width:1280px; margin:auto; padding:0 32px 56px; }.topbar { min-height
 .screenshot.real img { width:100%; height:100%; object-fit:cover; }
 .screenshot .corner { z-index:1; }
 .empty-evidence,.empty-findings { border:1px dashed var(--rule); color:#405049; font-size:14px; line-height:1.5; padding:28px; min-height:160px; display:grid; place-items:center; text-align:center; }
+.patch-diff { border:1px solid var(--ink); background:#fff; padding:16px; overflow:auto; }.patch-diff p { font-size:12px; }.patch-diff pre { margin:0; font:12px/1.5 "IBM Plex Mono",monospace; white-space:pre-wrap; }
+.evidence-pair { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }.evidence-pair figure { margin:0; border:1px solid var(--ink); background:#fff; }.evidence-pair img { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; }.evidence-pair figcaption,.schedule-list { padding:10px; font-size:13px; }.schedule-list { border:1px solid var(--ink); background:#fff; }.schedule-list p { margin:4px 0; }
