@@ -1,0 +1,24 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+
+# Local environment and credentials (commit only .env.example)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# AccessAgent generated evidence and local state
+data/
+artifacts/
+playwright-report/
+test-results/
+
+# Local tooling
+.DS_Store
+*.log
+
+# Product brief is intentionally kept local
+AccessAgent_PRD_TechDoc_v2.md
