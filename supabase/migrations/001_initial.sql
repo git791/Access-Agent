@@ -103,7 +103,13 @@ $$;
 
 alter table runs enable row level security;
 alter table findings enable row level security;
--- The dashboard uses a server-side service-role client. Add authenticated-user policies before enabling direct client reads.
+alter table run_events enable row level security;
+alter table patch_attempts enable row level security;
+alter table rescan_schedules enable row level security;
+alter table organizations enable row level security;
+alter table organization_memberships enable row level security;
+alter table audit_rate_windows enable row level security;
+-- The dashboard uses a server-side secret-key client. Add authenticated-user policies before enabling direct client reads.
 
 insert into storage.buckets (id, name, public) values ('evidence', 'evidence', false)
 on conflict (id) do nothing;
