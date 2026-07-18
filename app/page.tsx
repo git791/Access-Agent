@@ -9,7 +9,7 @@ type Schedule = { id: string; target_url: string; enabled: boolean; next_run_at:
 const trace = ["Crawl + Audit", "Visual inspection", "Patch proposal", "Re-render", "Verification"];
 
 export default function Home() {
-  const [url, setUrl] = useState("http://localhost:3000");
+  const [url, setUrl] = useState("https://access-agent-sable.vercel.app/demo-target");
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState("Ready. No finding is shown until a real audit produces it.");
   const [events, setEvents] = useState<string[]>([]);
