@@ -33,11 +33,12 @@ The dashboard can be explored without credentials. To activate the full runtime,
 ## Deployment checklist
 
 1. Apply `supabase/migrations/001_initial.sql` in the Supabase SQL editor.
-2. Configure the environment values in `.env.example` in Vercel and Inngest.
+2. Configure the Vercel dashboard environment values in `.env.example`.
 3. Connect the target repository to Vercel so every pushed AccessAgent branch receives a Preview Deployment.
 4. Configure `ACCESSAGENT_TEST_COMMAND` for the target repository.
-5. Deploy, then sync the `/api/inngest` endpoint with Inngest.
+5. Deploy the browser worker to Render as a Docker Web Service. Use the committed `Dockerfile`, set health check path to `/api/health`, and copy the server-side environment variables listed in `.env.example`. This service includes a full Chromium runtime.
+6. In Inngest, sync the Render worker endpoint: `https://<your-render-worker>.onrender.com/api/inngest`. Keep the Vercel endpoint for the dashboard/API, but Inngest workflows must use the Render endpoint.
 
-The CI workflow installs Chromium before type-checking and building. Vercel Sandbox executes any agent-generated patch separately from the dashboard runtime.
+The CI workflow installs Chromium before type-checking and building. Render hosts browser execution; Vercel Sandbox executes any agent-generated patch separately from the dashboard runtime.
 
 Run evidence and records are removed by a daily retention workflow after `ACCESSAGENT_RETENTION_DAYS` (30 by default). Optionally configure `ACCESSAGENT_ALERT_WEBHOOK_URL` to receive failed-run alerts.

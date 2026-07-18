@@ -1,0 +1,9 @@
+.git
+.next
+node_modules
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+AccessAgent_PRD_TechDoc_v2.md

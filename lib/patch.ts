@@ -11,7 +11,14 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
   const repository = required("ACCESSAGENT_REPO_URL");
   const client = new OpenAI({ apiKey: required("OPENAI_API_KEY") });
   const { Sandbox } = await import("@vercel/sandbox");
-  const sandbox: any = await Sandbox.create({ runtime: "node22", timeout: 10 * 60 * 1000 });
+  // Vercel provides OIDC automatically when this runs there. Render (and local
+  // workers) authenticate with this existing project-scoped access token instead.
+  const sandboxCredentials = process.env.VERCEL_OIDC_TOKEN ? {} : {
+    teamId: required("VERCEL_TEAM_ID"),
+    projectId: required("VERCEL_PROJECT_ID"),
+    token: required("VERCEL_TOKEN")
+  };
+  const sandbox: any = await Sandbox.create({ runtime: "node22", timeout: 10 * 60 * 1000, ...sandboxCredentials });
   const branch = `accessagent/run-${Date.now()}-attempt-${attempt}`.replace(/[^a-zA-Z0-9/_-]/g, "-");
   try {
     await sandbox.runCommand({ cmd: "git", args: ["clone", "--depth", "1", repository, "/vercel/sandbox/repo"] });

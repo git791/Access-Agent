@@ -1,0 +1,45 @@
+services:
+  - type: web
+    runtime: docker
+    name: access-agent-worker
+    region: virginia
+    plan: free
+    healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: INNGEST_EVENT_KEY
+        sync: false
+      - key: INNGEST_SIGNING_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_VISION_MODEL
+        sync: false
+      - key: OPENAI_PATCH_MODEL
+        sync: false
+      - key: ACCESSAGENT_REPO_URL
+        sync: false
+      - key: ACCESSAGENT_TEST_COMMAND
+        sync: false
+      - key: ACCESSAGENT_PUBLISH_PR_EVIDENCE
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_OWNER
+        sync: false
+      - key: GITHUB_REPO
+        sync: false
+      - key: GITHUB_BASE_BRANCH
+        sync: false
+      - key: VERCEL_TOKEN
+        sync: false
+      - key: VERCEL_PROJECT_ID
+        sync: false
+      - key: VERCEL_TEAM_ID
+        sync: false
