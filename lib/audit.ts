@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import axe from "axe-core";
 import { chromium } from "playwright";
 import { chromium as serverlessPlaywright } from "playwright-core";
 import serverlessChromium from "@sparticuz/chromium";
@@ -46,9 +47,10 @@ export async function crawlAndAudit(targetUrl: string, maxPages = 5, maxDepth = 
       const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
       const screenshot = await page.screenshot({ fullPage: true, type: "png" });
-      // The frame-partial runner can fail inside minimal serverless Chromium builds.
-      // This still runs the full axe ruleset against the rendered top-level page.
-      const results = await new AxeBuilder({ page }).setLegacyMode(true).analyze();
+      // Pin the browser payload independently of the helper package: axe 4.12's
+      // injected bundle currently crashes in Vercel's minimal Chromium runtime.
+      // Legacy mode still runs the full ruleset on the rendered top-level page.
+      const results = await new AxeBuilder({ page, axeSource: axe.source }).setLegacyMode(true).analyze();
       const accessibilityTree = await page.locator("body").ariaSnapshot().catch(() => "Accessibility tree unavailable");
       const issues: Issue[] = results.violations.flatMap((violation, ruleIndex) => violation.nodes.map((node, nodeIndex) => ({
         id: `axe-${violation.id}-${ruleIndex}-${nodeIndex}`,
