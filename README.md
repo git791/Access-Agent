@@ -39,3 +39,5 @@ The dashboard can be explored without credentials. To activate the full runtime,
 5. Deploy, then sync the `/api/inngest` endpoint with Inngest.
 
 The CI workflow installs Chromium before type-checking and building. Vercel Sandbox executes any agent-generated patch separately from the dashboard runtime.
+
+Run evidence and records are removed by a daily retention workflow after `ACCESSAGENT_RETENTION_DAYS` (30 by default). Optionally configure `ACCESSAGENT_ALERT_WEBHOOK_URL` to receive failed-run alerts.

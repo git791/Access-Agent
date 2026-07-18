@@ -1,7 +1,8 @@
 import { inngest } from "./client";
 import { crawlAndAudit } from "../lib/audit";
 import { inspectRenderedPage, verifyRenderedFix } from "../lib/visual-audit";
-import { advanceSchedule, createRun, dueSchedules, markVerdict, saveAudit, savePatches, saveVerificationEvidence, updateRun } from "../lib/store";
+import { advanceSchedule, createRun, dueSchedules, markVerdict, purgeExpiredRuns, saveAudit, savePatches, saveVerificationEvidence, updateRun, verifiedPullRequestEvidence } from "../lib/store";
+import { alertRunFailure } from "../lib/alerts";
 import { mergeAndPrioritize } from "../lib/prioritize";
 import { proposeAndApplyPatch } from "../lib/patch";
 import { waitForPreview } from "../lib/preview";
@@ -12,7 +13,8 @@ type AuditEvent = { name: "accessagent/audit.requested"; data: { runId: string; 
 type AuditedPage = { url: string; screenshotBase64: string; accessibilityTree: string; issues: Issue[] };
 
 function patchConfigured() {
-  return ["ACCESSAGENT_REPO_URL", "ACCESSAGENT_TEST_COMMAND", "GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO", "VERCEL_TOKEN", "VERCEL_PROJECT_ID"].every((key) => Boolean(process.env[key]));
+  const required = ["ACCESSAGENT_REPO_URL", "ACCESSAGENT_TEST_COMMAND", "GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO", "VERCEL_TOKEN", "VERCEL_PROJECT_ID"];
+  return process.env.ACCESSAGENT_PUBLISH_PR_EVIDENCE === "true" && required.every((key) => Boolean(process.env[key]));
 }
 
 function previewPage(previewBase: string, sourcePage: string) {
@@ -44,7 +46,7 @@ export const auditWorkflow = inngest.createFunction(
         return { pages: pages.length, issueCount: 0 };
       }
       if (!patchConfigured()) {
-        await step.run("mark-human-review", () => updateRun(data.runId, { status: "needs_review", message: "Audit completed. Patch/verify is waiting for disposable repository, sandbox test, GitHub, and Vercel preview configuration." }));
+        await step.run("mark-human-review", () => updateRun(data.runId, { status: "needs_review", message: "Audit completed. Patch/verify is waiting for repository, sandbox test, GitHub, Vercel preview, or PR-evidence publishing configuration." }));
         return { pages: pages.length, issueCount: candidates.length, status: "needs_review" };
       }
       const maxAttempts = Math.min(Math.max(Number(process.env.ACCESSAGENT_MAX_ATTEMPTS ?? 3), 1), 3);
@@ -77,12 +79,14 @@ export const auditWorkflow = inngest.createFunction(
         await step.run("mark-unverified-review", () => updateRun(data.runId, { status: "needs_review", message: "One or more patches could not be verified after the allowed attempts. No PR was created." }));
         return { pages: pages.length, issueCount: candidates.length, verified: verified.length, status: "needs_review" };
       }
-      const pullRequest = await step.run("create-verified-pr", () => createVerifiedPullRequest(finalBranch, verified));
+      const evidence = await step.run("load-verified-pr-evidence", () => verifiedPullRequestEvidence(data.runId, verified.map((issue) => issue.id)));
+      const pullRequest = await step.run("create-verified-pr", () => createVerifiedPullRequest(finalBranch, verified, data.runId, evidence));
       await step.run("mark-completed", () => updateRun(data.runId, { status: "completed", message: `All ${verified.length} fixes verified. Pull request #${pullRequest.data.number} created.` }));
       return { pages: pages.length, issueCount: candidates.length, verified: verified.length, pullRequest: pullRequest.data.html_url };
     } catch (error) {
       const message = error instanceof Error ? error.message : "The audit failed unexpectedly.";
       await updateRun(data.runId, { status: "failed", message });
+      await alertRunFailure(data.runId, message).catch(() => undefined);
       throw error;
     }
   }
@@ -102,5 +106,15 @@ export const scheduledRescanWorkflow = inngest.createFunction(
       });
     }
     return { queued: schedules.length };
+  }
+);
+
+export const retentionCleanupWorkflow = inngest.createFunction(
+  { id: "retention-cleanup" },
+  { cron: "30 2 * * *" },
+  async ({ step }) => {
+    const days = Math.max(Number(process.env.ACCESSAGENT_RETENTION_DAYS ?? 30), 1);
+    const purged = await step.run("purge-expired-runs-and-evidence", () => purgeExpiredRuns(days));
+    return { purged, retentionDays: days };
   }
 );

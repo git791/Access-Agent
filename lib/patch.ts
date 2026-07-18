@@ -31,11 +31,13 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
     if (!testCommand) throw new Error("Missing required configuration: ACCESSAGENT_TEST_COMMAND");
     const test = await sandbox.runCommand({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && ${testCommand}`] });
     if (test.exitCode !== 0) throw new Error(`Sandbox tests failed: ${test.stderr || test.stdout}`);
+    // Capture this before committing: after a successful commit, `git diff` is empty.
+    const changed = await sandbox.runCommand({ cmd: "git", args: ["-C", "/vercel/sandbox/repo", "diff", "--name-only"] });
+    const filesChanged = changed.stdout.split("\n").map((line: string) => line.trim()).filter(Boolean);
+    if (!filesChanged.length) throw new Error("Patch changed no source files after tests completed.");
     const token = required("GITHUB_TOKEN");
     await sandbox.runCommand({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && git config user.name 'AccessAgent' && git config user.email 'accessagent@users.noreply.github.com' && git add -A && git commit -m 'fix(a11y): verified candidate batch' && git remote set-url origin https://x-access-token:${token}@github.com/${required("GITHUB_OWNER")}/${required("GITHUB_REPO")}.git && git push origin ${branch}`] });
     const commit = await sandbox.runCommand({ cmd: "git", args: ["-C", "/vercel/sandbox/repo", "rev-parse", "HEAD"] });
-    const changed = await sandbox.runCommand({ cmd: "git", args: ["-C", "/vercel/sandbox/repo", "diff", "--name-only"] });
-    const filesChanged = changed.stdout.split("\n").map((line: string) => line.trim()).filter(Boolean);
     return issues.map((issue) => ({ issueId: issue.id, branch, filesChanged, diff, attempt, commitSha: commit.stdout.trim() }));
   } finally { await sandbox.stop(); }
 }

@@ -1,6 +1,6 @@
 import { serve } from "inngest/next";
 import { inngest } from "../../../inngest/client";
-import { auditWorkflow, scheduledRescanWorkflow } from "../../../inngest/functions";
+import { auditWorkflow, retentionCleanupWorkflow, scheduledRescanWorkflow } from "../../../inngest/functions";
 
 export const maxDuration = 60;
-export const { GET, POST, PUT } = serve({ client: inngest, functions: [auditWorkflow, scheduledRescanWorkflow] });
+export const { GET, POST, PUT } = serve({ client: inngest, functions: [auditWorkflow, scheduledRescanWorkflow, retentionCleanupWorkflow] });

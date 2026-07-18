@@ -3,6 +3,7 @@ create type finding_status as enum ('Found', 'Verified', 'Review');
 
 create table runs (
   id uuid primary key,
+  user_id uuid references auth.users(id) on delete set null,
   owner_token text not null,
   target_url text not null,
   status run_status not null,
@@ -49,6 +50,7 @@ create table patch_attempts (
 
 create table rescan_schedules (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
   target_url text not null,
   owner_token text not null,
   max_pages integer not null default 5 check (max_pages between 1 and 15),
@@ -57,6 +59,24 @@ create table rescan_schedules (
   next_run_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+
+create table organizations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create type organization_role as enum ('owner', 'admin', 'member', 'viewer');
+create table organization_memberships (
+  organization_id uuid not null references organizations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role organization_role not null default 'member',
+  created_at timestamptz not null default now(),
+  primary key (organization_id, user_id)
+);
+
+alter table runs add column organization_id uuid references organizations(id) on delete set null;
 
 create table audit_rate_windows (
   bucket text primary key,

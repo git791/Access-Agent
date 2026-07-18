@@ -1,12 +1,15 @@
 import { eventsSince } from "../../../../../lib/store";
 import { getRun } from "../../../../../lib/store";
+import { authenticatedUser } from "../../../../../lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request, context: { params: Promise<{ runId: string }> }) {
   const { runId } = await context.params;
   const ownerToken = request.headers.get("cookie")?.match(new RegExp(`(?:^|; )accessagent-run-${runId}=([^;]+)`))?.[1];
-  if (!ownerToken || !await getRun(runId, ownerToken)) return new Response("Run access denied.", { status: 403 });
+  const user = await authenticatedUser(request);
+  if (process.env.ACCESSAGENT_REQUIRE_AUTH === "true" && !user) return new Response("Sign in with GitHub to access this run.", { status: 401 });
+  if (!ownerToken || !await getRun(runId, ownerToken, user?.id)) return new Response("Run access denied.", { status: 403 });
   const encoder = new TextEncoder();
   let lastId = Number(new URL(request.url).searchParams.get("after") ?? 0);
   const stream = new ReadableStream({

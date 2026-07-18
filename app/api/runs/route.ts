@@ -4,6 +4,7 @@ import { inngest } from "../../../inngest/client";
 import { createRun } from "../../../lib/store";
 import { assertAuditableUrl } from "../../../lib/url-security";
 import { enforceAuditRateLimit } from "../../../lib/rate-limit";
+import { authenticatedUser } from "../../../lib/auth";
 
 export const runtime = "nodejs";
 
@@ -15,12 +16,14 @@ export async function POST(request: Request) {
 
   const configuration = runtimeConfiguration();
   if (!configuration.ready) return NextResponse.json({ error: `Live audits are unavailable until configuration is complete: ${configuration.missing.join(", ")}.` }, { status: 503 });
+  const user = await authenticatedUser(request);
+  if (process.env.ACCESSAGENT_REQUIRE_AUTH === "true" && !user) return NextResponse.json({ error: "Sign in with GitHub before starting an audit." }, { status: 401 });
   try { await enforceAuditRateLimit(request); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to apply audit rate limit." }, { status: 429 }); }
   const runId = crypto.randomUUID();
   const maxPages = Math.min(Math.max(Number(process.env.ACCESSAGENT_MAX_PAGES ?? 5), 1), 15);
   const maxDepth = Math.min(Math.max(Number(process.env.ACCESSAGENT_MAX_DEPTH ?? 2), 0), 2);
   const ownerToken = crypto.randomUUID();
-  await createRun({ id: runId, ownerToken, targetUrl, status: "queued", message: "Audit queued.", findings: [] });
+  await createRun({ id: runId, ownerToken, userId: user?.id, targetUrl, status: "queued", message: "Audit queued.", findings: [] });
   await inngest.send({ name: "accessagent/audit.requested", data: { runId, targetUrl, maxPages, maxDepth } });
   const response = NextResponse.json({
     runId,

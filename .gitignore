@@ -3,11 +3,10 @@ node_modules/
 .next/
 out/
 coverage/
+*.tsbuildinfo
 
 # Local environment and credentials (commit only .env.example)
-.env
-.env.local
-.env.*.local
+.env*
 !.env.example
 
 # AccessAgent generated evidence and local state
@@ -17,6 +16,7 @@ playwright-report/
 test-results/
 
 # Local tooling
+.vercel/
 .DS_Store
 *.log
 

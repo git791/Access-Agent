@@ -11,3 +11,17 @@ test("controlled demo target exposes seeded accessibility defects", async ({ pag
   await expect(page.getByRole("heading", { name: "Acme Store" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Checkout" })).toBeVisible();
 });
+
+test("controlled demo target provides five crawlable pages", async ({ page }) => {
+  const routes = [
+    ["/demo-target", "Acme Store"],
+    ["/demo-target/catalog", "Browse the collection"],
+    ["/demo-target/product", "Field jacket"],
+    ["/demo-target/checkout", "Checkout"],
+    ["/demo-target/support", "Support"],
+  ] as const;
+  for (const [route, heading] of routes) {
+    await page.goto(route);
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
+});
