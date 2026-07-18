@@ -54,8 +54,11 @@ async function fallbackViolations(page: Page): Promise<AxeViolation[]> {
 /** Uses Playwright's local browser in development and a bundled Chromium on Vercel. */
 async function launchAuditBrowser() {
   if (process.env.VERCEL === "1") {
+    // Accessibility scans do not need WebGL. Disabling it prevents SwiftShader
+    // from exhausting Vercel's constrained shared-memory area on launch.
+    serverlessChromium.setGraphicsMode = false;
     return serverlessPlaywright.launch({
-      args: serverlessChromium.args,
+      args: [...serverlessChromium.args, "--disable-gpu", "--disable-software-rasterizer"],
       executablePath: await serverlessChromium.executablePath(),
       headless: true,
     });
