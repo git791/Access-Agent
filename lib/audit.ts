@@ -1,5 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
+import { chromium as serverlessPlaywright } from "playwright-core";
+import serverlessChromium from "@sparticuz/chromium";
 import type { Issue } from "./contracts";
 
 export type PageAudit = { url: string; screenshotBase64: string; accessibilityTree: string; issues: Issue[] };
@@ -18,9 +20,21 @@ function helps(rule: string) {
   return "People using assistive technology receive a more reliable experience.";
 }
 
+/** Uses Playwright's local browser in development and a bundled Chromium on Vercel. */
+async function launchAuditBrowser() {
+  if (process.env.VERCEL === "1") {
+    return serverlessPlaywright.launch({
+      args: serverlessChromium.args,
+      executablePath: await serverlessChromium.executablePath(),
+      headless: true,
+    });
+  }
+  return chromium.launch({ headless: true });
+}
+
 export async function crawlAndAudit(targetUrl: string, maxPages = 5, maxDepth = 2): Promise<PageAudit[]> {
   const origin = new URL(targetUrl).origin;
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchAuditBrowser();
   const seen = new Set<string>();
   const queue = [{ url: targetUrl, depth: 0 }];
   const audits: PageAudit[] = [];
