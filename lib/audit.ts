@@ -46,7 +46,9 @@ export async function crawlAndAudit(targetUrl: string, maxPages = 5, maxDepth = 
       const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
       const screenshot = await page.screenshot({ fullPage: true, type: "png" });
-      const results = await new AxeBuilder({ page }).analyze();
+      // The frame-partial runner can fail inside minimal serverless Chromium builds.
+      // This still runs the full axe ruleset against the rendered top-level page.
+      const results = await new AxeBuilder({ page }).setLegacyMode(true).analyze();
       const accessibilityTree = await page.locator("body").ariaSnapshot().catch(() => "Accessibility tree unavailable");
       const issues: Issue[] = results.violations.flatMap((violation, ruleIndex) => violation.nodes.map((node, nodeIndex) => ({
         id: `axe-${violation.id}-${ruleIndex}-${nodeIndex}`,
