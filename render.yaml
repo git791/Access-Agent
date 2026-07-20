@@ -23,6 +23,14 @@ services:
         sync: false
       - key: OPENAI_PATCH_MODEL
         sync: false
+      - key: ACCESSAGENT_AI_PROVIDER
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_VISION_MODEL
+        sync: false
+      - key: GROQ_PATCH_MODEL
+        sync: false
       - key: ACCESSAGENT_REPO_URL
         sync: false
       - key: ACCESSAGENT_TEST_COMMAND
