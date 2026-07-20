@@ -41,7 +41,7 @@ The dashboard can be explored without credentials. To activate the full runtime,
 
 ## AI provider switch
 
-OpenAI is the default and production path. If an OpenAI project is temporarily unavailable, the Render worker can use Groq's OpenAI-compatible API for a proof run: set `ACCESSAGENT_AI_PROVIDER=groq`, `GROQ_API_KEY`, `GROQ_VISION_MODEL=qwen/qwen3.6-27b`, and `GROQ_PATCH_MODEL=openai/gpt-oss-120b` in Render, then redeploy that worker. To return to strict OpenAI, delete that provider setting or set `ACCESSAGENT_AI_PROVIDER=openai` and redeploy. The Groq key is inactive when the provider is OpenAI.
+OpenAI is the default and production path. If an OpenAI project is temporarily unavailable, the Render worker can use Groq's OpenAI-compatible API for a proof run: set `ACCESSAGENT_AI_PROVIDER=groq`, `GROQ_API_KEY`, `GROQ_VISION_MODEL=qwen/qwen3.6-27b`, and `GROQ_PATCH_MODEL=openai/gpt-oss-120b` in Render, then redeploy that worker. Groq's vision model uses JSON Object Mode and AccessAgent validates the result with Zod; the OpenAI path retains strict JSON Schema. To return to strict OpenAI, delete that provider setting or set `ACCESSAGENT_AI_PROVIDER=openai` and redeploy. The Groq key is inactive when the provider is OpenAI.
 
 The CI workflow installs Chromium before type-checking and building. Render hosts browser execution; Vercel Sandbox executes any agent-generated patch separately from the dashboard runtime.
 

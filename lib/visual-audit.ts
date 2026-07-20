@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Issue } from "./contracts";
-import { aiClient, imageDetail, modelFor } from "./ai-provider";
+import { aiClient, imageDetail, modelFor, outputFormat } from "./ai-provider";
 
 const VisualIssueSchema = z.object({ title: z.string(), wcag: z.string(), impact: z.enum(["Critical", "Serious", "Moderate"]), helps: z.string(), selector: z.string() });
 const VisualResultSchema = z.object({ issues: z.array(VisualIssueSchema) });
@@ -13,7 +13,7 @@ export async function inspectRenderedPage(screenshot: Buffer, accessibilityTree:
   const response = await client.responses.create({
     model: modelFor("vision"),
     input: [{ role: "user", content: [{ type: "input_text", text: prompt }, { type: "input_image", image_url: `data:image/png;base64,${screenshot.toString("base64")}`, detail: imageDetail() }] }],
-    text: { format: { type: "json_schema", name: "visual_audit", strict: true, schema: visualSchema } }
+    text: { format: outputFormat("visual_audit", visualSchema) }
   });
   const parsed = VisualResultSchema.safeParse(JSON.parse(response.output_text));
   if (!parsed.success) throw new Error("Visual auditor returned an invalid response.");
@@ -32,7 +32,7 @@ export async function verifyRenderedFix(before: Buffer, after: Buffer, issue: Is
       { type: "input_image", image_url: `data:image/png;base64,${before.toString("base64")}`, detail: imageDetail() },
       { type: "input_image", image_url: `data:image/png;base64,${after.toString("base64")}`, detail: imageDetail() }
     ] }],
-    text: { format: { type: "json_schema", name: "verification_verdict", strict: true, schema: verdictSchema } }
+    text: { format: outputFormat("verification_verdict", verdictSchema) }
   });
   const parsed = VerdictResponseSchema.safeParse(JSON.parse(response.output_text));
   if (!parsed.success) throw new Error("Verification role returned an invalid verdict.");

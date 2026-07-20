@@ -35,3 +35,12 @@ export function modelFor(role: AiRole): string {
 export function imageDetail(): "auto" | "high" {
   return aiProvider() === "groq" ? "auto" : "high";
 }
+
+/**
+ * Groq's vision-capable Qwen model supports JSON Object Mode, but not strict
+ * JSON Schema. We still validate every response with Zod before using it.
+ */
+export function outputFormat(name: string, schema: any) {
+  if (aiProvider() === "groq") return { type: "json_object" as const };
+  return { type: "json_schema" as const, name, strict: true as const, schema };
+}
