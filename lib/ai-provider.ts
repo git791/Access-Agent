@@ -31,9 +31,10 @@ export function modelFor(role: AiRole): string {
     : process.env.OPENAI_PATCH_MODEL || "gpt-5.4";
 }
 
-// Groq's OpenAI-compatible Responses examples use automatic image detail.
-export function imageDetail(): "auto" | "high" {
-  return aiProvider() === "groq" ? "auto" : "high";
+// Keep Groq proof runs inside its lower TPM allowance. OpenAI production runs
+// retain high-detail evidence inspection.
+export function imageDetail(): "low" | "high" {
+  return aiProvider() === "groq" ? "low" : "high";
 }
 
 /**
