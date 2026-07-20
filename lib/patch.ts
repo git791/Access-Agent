@@ -39,11 +39,23 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
     const terms = issues.flatMap((issue) => [issue.selector, new URL(issue.pageUrl ?? "http://localhost/").pathname.split("/").filter(Boolean).pop()]).filter(Boolean).map((term) => String(term).replace(/[^a-zA-Z0-9_-]/g, "")).filter((term) => term.length > 2).slice(0, 12);
     const locations = await run({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && rg -n -i --glob '!node_modules/**' '${terms.join("|") || "a11y"}' . | head -120 || true`] }, "source search");
     const [inventoryOutput, routeMapOutput, locationsOutput] = await Promise.all([output(inventory), output(routeMap), output(locations)]);
-    const prompt = `You are the patch role in a closed accessibility verification loop. Return JSON with exactly one field, "diff". Its value must be one unified git diff beginning with "diff --git", and nothing else. Make the smallest safe source-level fixes for these accessibility issues: ${JSON.stringify(issues)}. Framework route map: ${routeMapOutput.stdout}. Candidate files: ${inventoryOutput.stdout}. Source matches derived from the affected route/selector: ${locationsOutput.stdout}. First identify the route component matching each issue's pageUrl, then modify only the responsible component/style. Do not modify lockfiles, dependencies, generated files, dependencies, tests, or unrelated code. The diff must apply cleanly with git apply.`;
-    const diff = await generatePatchDiff(prompt);
-    if (!diff.startsWith("diff --git")) throw new Error("Patch role did not return a unified git diff.");
-    const encoded = Buffer.from(diff).toString("base64");
-    await run({ cmd: "sh", args: ["-lc", `echo ${encoded} | base64 -d > /tmp/accessagent.patch && cd /vercel/sandbox/repo && git apply --check /tmp/accessagent.patch && git apply /tmp/accessagent.patch && git diff --check`] }, "patch application");
+    const prompt = `You are the patch role in a closed accessibility verification loop. Return JSON with exactly one field, "diff". Its value must be a complete unified git diff beginning with "diff --git", and nothing else. Make the smallest safe source-level fixes for these accessibility issues: ${JSON.stringify(issues)}. Framework route map: ${routeMapOutput.stdout}. Candidate files: ${inventoryOutput.stdout}. Source matches derived from the affected route/selector: ${locationsOutput.stdout}. First identify the route component matching each issue's pageUrl, then modify only the responsible component/style. Do not modify lockfiles, dependencies, generated files, dependencies, tests, or unrelated code. Every hunk header must have correct old/new line counts. The diff must apply cleanly with git apply --check.`;
+    let diff = await generatePatchDiff(prompt);
+    let lastPatchError = "";
+    for (let generation = 1; generation <= 2; generation++) {
+      if (diff.startsWith("diff --git")) {
+        const encoded = Buffer.from(diff).toString("base64");
+        const check = await sandbox.runCommand({ cmd: "sh", args: ["-lc", `echo ${encoded} | base64 -d > /tmp/accessagent.patch && cd /vercel/sandbox/repo && git apply --check /tmp/accessagent.patch`] });
+        if (check.exitCode === 0) break;
+        const { stdout, stderr } = await output(check);
+        lastPatchError = stderr || stdout || `exit code ${check.exitCode}`;
+      } else {
+        lastPatchError = "Response did not begin with diff --git.";
+      }
+      if (generation === 2) throw new Error(`Patch model produced a non-applicable diff after two attempts: ${lastPatchError}`);
+      diff = await generatePatchDiff(`${prompt}\n\nThe previous candidate was rejected by git apply --check: ${lastPatchError}\nReturn a newly generated complete replacement diff. Do not explain it, do not preserve malformed hunk headers, and do not use Markdown fences.`);
+    }
+    await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && git apply /tmp/accessagent.patch && git diff --check"] }, "patch application");
     const testCommand = process.env.ACCESSAGENT_TEST_COMMAND;
     if (!testCommand) throw new Error("Missing required configuration: ACCESSAGENT_TEST_COMMAND");
     await run({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && ${testCommand}`] }, "tests");
