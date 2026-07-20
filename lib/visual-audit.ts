@@ -11,17 +11,31 @@ async function generateVisionJson(prompt: string, screenshots: Buffer[], name: s
   const client = aiClient();
   const encoded = screenshots.map((screenshot) => `data:image/png;base64,${screenshot.toString("base64")}`);
   if (aiProvider() === "groq") {
-    const response = await client.chat.completions.create({
-      model: modelFor("vision"),
-      messages: [{
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          ...encoded.map((url) => ({ type: "image_url" as const, image_url: { url, detail: imageDetail() } }))
-        ]
-      }]
-    });
-    return response.choices[0]?.message.content ?? "";
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await client.chat.completions.create({
+          model: modelFor("vision"),
+          messages: [{
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...encoded.map((url) => ({ type: "image_url" as const, image_url: { url, detail: imageDetail() } }))
+            ]
+          }]
+        });
+        return response.choices[0]?.message.content ?? "";
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : "";
+        if (attempt === 0 && /premature close|econnreset|fetch failed/i.test(message)) {
+          await new Promise((resolve) => setTimeout(resolve, 1_000));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
   }
   const format = outputFormat(name, schema);
   const response = await client.responses.create({
