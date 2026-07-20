@@ -38,10 +38,10 @@ export function imageDetail(): "low" | "high" {
 }
 
 /**
- * Groq's vision-capable Qwen model supports JSON Object Mode, but not strict
- * JSON Schema. We still validate every response with Zod before using it.
+ * Groq's vision-capable Qwen endpoint does not reliably accept a response
+ * format option. Its prompt-only JSON output is validated with Zod locally.
  */
 export function outputFormat(name: string, schema: any) {
-  if (aiProvider() === "groq") return { type: "json_object" as const };
+  if (aiProvider() === "groq") return undefined;
   return { type: "json_schema" as const, name, strict: true as const, schema };
 }
