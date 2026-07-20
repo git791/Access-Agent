@@ -29,8 +29,8 @@ function geminiClient() {
 export function modelFor(role: AiRole): string {
   if (aiProvider() === "gemini") {
     return role === "vision"
-      ? process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash"
-      : process.env.GEMINI_PATCH_MODEL || "gemini-2.5-flash";
+      ? process.env.GEMINI_VISION_MODEL || "gemini-3.5-flash"
+      : process.env.GEMINI_PATCH_MODEL || "gemini-3.5-flash";
   }
   return role === "vision"
     ? process.env.OPENAI_VISION_MODEL || "gpt-5-mini"
@@ -46,12 +46,13 @@ export function accessibilityContextLimit(): number {
 /** Generates a text response for the patch-authoring role through the selected adapter. */
 export async function generateText(prompt: string, role: AiRole): Promise<string> {
   if (aiProvider() === "gemini") {
-    const response = await geminiClient().models.generateContent({
+    const response = await geminiClient().interactions.create({
       model: modelFor(role),
-      contents: prompt,
-      config: { maxOutputTokens: 4_000 }
+      input: prompt,
+      store: false,
+      generation_config: { max_output_tokens: 4_000 }
     });
-    return response.text ?? "";
+    return response.output_text ?? "";
   }
 
   const response = await openAiClient().responses.create({ model: modelFor(role), input: prompt });
@@ -64,24 +65,21 @@ export async function generateText(prompt: string, role: AiRole): Promise<string
  */
 export async function generateVisionJson({ prompt, screenshots, schema }: VisionRequest): Promise<string> {
   if (aiProvider() === "gemini") {
-    const response = await geminiClient().models.generateContent({
+    const response = await geminiClient().interactions.create({
       model: modelFor("vision"),
-      contents: [{
-        role: "user",
-        parts: [
-          { text: prompt },
-          ...screenshots.map((screenshot) => ({
-            inlineData: { mimeType: "image/png", data: screenshot.toString("base64") }
-          }))
-        ]
-      }],
-      config: {
-        responseMimeType: "application/json",
-        responseJsonSchema: schema,
-        maxOutputTokens: 2_000
-      }
+      input: [
+        { type: "text", text: prompt },
+        ...screenshots.map((screenshot) => ({
+          type: "image" as const,
+          mime_type: "image/png",
+          data: screenshot.toString("base64")
+        }))
+      ],
+      store: false,
+      response_format: { type: "text", mime_type: "application/json", schema },
+      generation_config: { max_output_tokens: 2_000 }
     });
-    return response.text ?? "";
+    return response.output_text ?? "";
   }
 
   const encoded = screenshots.map((screenshot) => `data:image/png;base64,${screenshot.toString("base64")}`);

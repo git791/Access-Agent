@@ -33,8 +33,8 @@ test("Gemini test adapter selects Gemini defaults and requires its own key", () 
     INNGEST_SIGNING_KEY: "signing-key"
   }, () => {
     assert.equal(aiProvider(), "gemini");
-    assert.equal(modelFor("vision"), "gemini-2.5-flash");
-    assert.equal(modelFor("patch"), "gemini-2.5-flash");
+    assert.equal(modelFor("vision"), "gemini-3.5-flash");
+    assert.equal(modelFor("patch"), "gemini-3.5-flash");
     assert.deepEqual(runtimeConfiguration(), { ready: false, missing: ["GEMINI_API_KEY"] });
   });
 });
