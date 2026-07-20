@@ -78,7 +78,22 @@ export const auditWorkflow = inngest.createFunction(
           const modelVerdict = await verifyRenderedFix(Buffer.from(source.screenshotBase64, "base64"), afterScreenshot, issue, after.accessibilityTree);
           const beforeKeys = new Set(source.issues.filter(seriousOrCritical).map((candidate) => `${candidate.wcag}:${candidate.selector ?? candidate.title}`));
           const newRegression = after.issues.filter(seriousOrCritical).some((candidate) => !beforeKeys.has(`${candidate.wcag}:${candidate.selector ?? candidate.title}`));
-          const verdict = { ...modelVerdict, regression: modelVerdict.regression || newRegression, explanation: newRegression ? `${modelVerdict.explanation} A new serious or critical axe violation was also detected.` : modelVerdict.explanation };
+          const issueKey = `${issue.wcag}:${issue.selector ?? issue.title}`;
+          const axeStillReportsIssue = after.issues.some((candidate) => `${candidate.wcag}:${candidate.selector ?? candidate.title}` === issueKey);
+          // Axe is authoritative for its own machine-detectable rules. A visual
+          // model cannot see an invisible alt attribute, so it must not overrule
+          // the fresh browser audit when that rule has disappeared.
+          const axeResolved = issue.id.startsWith("axe-") && !axeStillReportsIssue;
+          const verdict = {
+            ...modelVerdict,
+            resolved: axeResolved || modelVerdict.resolved,
+            regression: modelVerdict.regression || newRegression,
+            explanation: newRegression
+              ? `${modelVerdict.explanation} A new serious or critical axe violation was also detected.`
+              : axeResolved
+                ? "Axe no longer reports this machine-detectable accessibility violation in the re-rendered preview."
+                : modelVerdict.explanation
+          };
           const afterPath = await saveVerificationEvidence(data.runId, issue.id, afterScreenshot);
           const complete: Verdict = { issueId: issue.id, ...verdict, afterScreenshotPath: afterPath };
           await markVerdict(data.runId, complete);
