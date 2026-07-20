@@ -37,6 +37,11 @@ export function imageDetail(): "low" | "high" {
   return aiProvider() === "groq" ? "low" : "high";
 }
 
+// Keep the fallback's prompt below Groq's small proof-tier TPM allowance.
+export function accessibilityContextLimit(): number {
+  return aiProvider() === "groq" ? 2_000 : 12_000;
+}
+
 /**
  * Groq's vision-capable Qwen endpoint does not reliably accept a response
  * format option. Its prompt-only JSON output is validated with Zod locally.
