@@ -34,8 +34,8 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
   try {
     await run({ cmd: "git", args: ["clone", "--depth", "1", repository, "/vercel/sandbox/repo"] }, "clone");
     await run({ cmd: "git", args: ["-C", "/vercel/sandbox/repo", "checkout", "-b", branch] }, "branch creation");
-    const inventory = await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && find . -path './node_modules' -prune -o -type f \( -name '*.tsx' -o -name '*.ts' -o -name '*.jsx' -o -name '*.js' -o -name '*.css' \) -print | head -100"] }, "file inventory");
-    const routeMap = await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && { find app src/app pages src/pages -type f \( -name 'page.*' -o -name 'route.*' -o -name 'index.*' \) 2>/dev/null || true; } | head -100"] }, "route discovery");
+    const inventory = await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && find . -path './node_modules' -prune -o -type f \\( -name '*.tsx' -o -name '*.ts' -o -name '*.jsx' -o -name '*.js' -o -name '*.css' \\) -print | head -100"] }, "file inventory");
+    const routeMap = await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && { find app src/app pages src/pages -type f \\( -name 'page.*' -o -name 'route.*' -o -name 'index.*' \\) 2>/dev/null || true; } | head -100"] }, "route discovery");
     const terms = issues.flatMap((issue) => [issue.selector, new URL(issue.pageUrl ?? "http://localhost/").pathname.split("/").filter(Boolean).pop()]).filter(Boolean).map((term) => String(term).replace(/[^a-zA-Z0-9_-]/g, "")).filter((term) => term.length > 2).slice(0, 12);
     const locations = await run({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && rg -n -i --glob '!node_modules/**' '${terms.join("|") || "a11y"}' . | head -120 || true`] }, "source search");
     const [inventoryOutput, routeMapOutput, locationsOutput] = await Promise.all([output(inventory), output(routeMap), output(locations)]);
