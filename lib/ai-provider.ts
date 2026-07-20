@@ -50,3 +50,17 @@ export function outputFormat(name: string, schema: any) {
   if (aiProvider() === "groq") return undefined;
   return { type: "json_schema" as const, name, strict: true as const, schema };
 }
+
+/** Groq's OpenAI-compatible Chat Completions endpoint is used for fallback text. */
+export async function generateText(prompt: string, role: AiRole): Promise<string> {
+  const client = aiClient();
+  if (aiProvider() === "groq") {
+    const response = await client.chat.completions.create({
+      model: modelFor(role),
+      messages: [{ role: "user", content: prompt }]
+    });
+    return response.choices[0]?.message.content ?? "";
+  }
+  const response = await client.responses.create({ model: modelFor(role), input: prompt });
+  return response.output_text;
+}

@@ -1,5 +1,5 @@
 import { required } from "./config";
-import { aiClient, modelFor } from "./ai-provider";
+import { generateText } from "./ai-provider";
 import type { Issue, PatchHandoff } from "./contracts";
 
 /**
@@ -9,7 +9,6 @@ import type { Issue, PatchHandoff } from "./contracts";
 export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promise<PatchHandoff[]> {
   if (!issues.length) throw new Error("Cannot patch an empty issue set.");
   const repository = required("ACCESSAGENT_REPO_URL");
-  const client = aiClient();
   const { Sandbox } = await import("@vercel/sandbox");
   // Vercel provides OIDC automatically when this runs there. Render (and local
   // workers) authenticate with this existing project-scoped access token instead.
@@ -28,8 +27,7 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
     const terms = issues.flatMap((issue) => [issue.selector, new URL(issue.pageUrl ?? "http://localhost/").pathname.split("/").filter(Boolean).pop()]).filter(Boolean).map((term) => String(term).replace(/[^a-zA-Z0-9_-]/g, "")).filter((term) => term.length > 2).slice(0, 12);
     const locations = await sandbox.runCommand({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && rg -n -i --glob '!node_modules/**' '${terms.join("|") || "a11y"}' . | head -120 || true`] });
     const prompt = `You are the patch role. Produce one unified git diff only, with the smallest safe source-level fixes for these accessibility issues: ${JSON.stringify(issues)}. Framework route map: ${routeMap.stdout}. Candidate files: ${inventory.stdout}. Source matches derived from the affected route/selector: ${locations.stdout}. First identify the route component matching each issue's pageUrl, then modify only the responsible component/style. Do not modify lockfiles, dependencies, or unrelated code. The diff must apply with git apply.`;
-    const response = await client.responses.create({ model: modelFor("patch"), input: prompt });
-    const diff = response.output_text.replace(/^```diff\s*|^```\s*|```$/gm, "").trim();
+    const diff = (await generateText(prompt, "patch")).replace(/^```diff\s*|^```\s*|```$/gm, "").trim();
     if (!diff.startsWith("diff --git")) throw new Error("Patch role did not return a unified git diff.");
     const encoded = Buffer.from(diff).toString("base64");
     const apply = await sandbox.runCommand({ cmd: "sh", args: ["-lc", `echo ${encoded} | base64 -d > /tmp/accessagent.patch && cd /vercel/sandbox/repo && git apply --check /tmp/accessagent.patch && git apply /tmp/accessagent.patch && git diff --check`] });
