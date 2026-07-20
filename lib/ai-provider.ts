@@ -14,12 +14,30 @@ type VisionRequest = {
   schema: Record<string, unknown>;
 };
 
-const patchDiffSchema = {
+const patchEditsSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["diff"],
-  properties: { diff: { type: "string" } }
+  required: ["edits"],
+  properties: {
+    edits: {
+      type: "array",
+      minItems: 1,
+      maxItems: 8,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["path", "oldText", "newText"],
+        properties: {
+          path: { type: "string" },
+          oldText: { type: "string" },
+          newText: { type: "string" }
+        }
+      }
+    }
+  }
 } as const;
+
+export type PatchEdit = { path: string; oldText: string; newText: string };
 
 /** OpenAI is the production default. Gemini is an explicit, isolated proof provider. */
 export function aiProvider(): AiProvider {
@@ -69,15 +87,15 @@ export async function generateText(prompt: string, role: AiRole): Promise<string
   return response.output_text;
 }
 
-/** Returns a machine-extracted unified diff, never conversational prose. */
-export async function generatePatchDiff(prompt: string): Promise<string> {
+/** Returns exact source replacements; the sandbox generates the authoritative Git diff. */
+export async function generatePatchEdits(prompt: string): Promise<PatchEdit[]> {
   let output: string;
   if (aiProvider() === "gemini") {
     const response = await geminiClient().interactions.create({
       model: modelFor("patch"),
       input: prompt,
       store: false,
-      response_format: { type: "text", mime_type: "application/json", schema: patchDiffSchema },
+      response_format: { type: "text", mime_type: "application/json", schema: patchEditsSchema },
       generation_config: { max_output_tokens: 6_000 }
     }, { timeout_ms: PROVIDER_TIMEOUT_MS });
     output = response.output_text ?? "";
@@ -85,14 +103,16 @@ export async function generatePatchDiff(prompt: string): Promise<string> {
     const response = await openAiClient().responses.create({
       model: modelFor("patch"),
       input: prompt,
-      text: { format: { type: "json_schema", name: "patch_diff", strict: true, schema: patchDiffSchema } }
+      text: { format: { type: "json_schema", name: "patch_edits", strict: true, schema: patchEditsSchema } }
     });
     output = response.output_text;
   }
 
-  const parsed = JSON.parse(output) as { diff?: unknown };
-  if (typeof parsed.diff !== "string") throw new Error("Patch role did not return a diff field.");
-  return parsed.diff.trim();
+  const parsed = JSON.parse(output) as { edits?: unknown };
+  if (!Array.isArray(parsed.edits) || !parsed.edits.every((edit) => edit && typeof edit === "object" && typeof (edit as PatchEdit).path === "string" && typeof (edit as PatchEdit).oldText === "string" && typeof (edit as PatchEdit).newText === "string")) {
+    throw new Error("Patch role did not return valid source edits.");
+  }
+  return parsed.edits as PatchEdit[];
 }
 
 /**
