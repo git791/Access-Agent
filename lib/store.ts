@@ -83,7 +83,20 @@ export async function advanceSchedule(id: string) {
 }
 
 export async function createRescanSchedule(targetUrl: string, ownerToken: string, userId: string | undefined, maxPages: number, maxDepth: number) {
-  const { data, error } = await db().from("rescan_schedules").insert({ target_url: targetUrl, owner_token: ownerToken, user_id: userId, max_pages: maxPages, max_depth: maxDepth, next_run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() }).select("id, next_run_at").single();
+  const client = db();
+  const { data: existing, error: existingError } = await client.from("rescan_schedules")
+    .select("id, target_url, enabled, next_run_at")
+    .eq("owner_token", ownerToken)
+    .eq("target_url", targetUrl)
+    .eq("enabled", true)
+    .limit(1)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return existing;
+  const { data, error } = await client.from("rescan_schedules")
+    .insert({ target_url: targetUrl, owner_token: ownerToken, user_id: userId, max_pages: maxPages, max_depth: maxDepth, next_run_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })
+    .select("id, target_url, enabled, next_run_at")
+    .single();
   if (error) throw error;
   return data;
 }

@@ -26,5 +26,5 @@ export async function POST(request: Request, context: { params: Promise<{ runId:
   const maxPages = Math.min(Math.max(Number(process.env.ACCESSAGENT_MAX_PAGES ?? 5), 1), 15);
   const maxDepth = Math.min(Math.max(Number(process.env.ACCESSAGENT_MAX_DEPTH ?? 2), 0), 2);
   const schedule = await createRescanSchedule(run.targetUrl, ownerToken.ownerToken, ownerToken.userId, maxPages, maxDepth);
-  return NextResponse.json({ schedule });
+  return NextResponse.json({ schedule, schedules: await schedulesFor(ownerToken.ownerToken) });
 }

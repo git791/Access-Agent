@@ -60,7 +60,7 @@ export default function Home() {
     const response = await fetch(`/api/runs/${run.id}/schedule`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) { setScheduleMessage(result.error || "Unable to schedule rescan."); return; }
-    setSchedules((current) => [result.schedule, ...current]); setScheduleMessage("Daily rescan scheduled.");
+    setSchedules(result.schedules ?? [result.schedule]); setScheduleMessage("Daily rescan scheduled.");
   }
   const findings = run?.findings ?? [];
   const activeStep = run?.status === "auditing" ? 1 : run?.status === "patching" ? 2 : run?.status === "verifying" ? 4 : 0;
