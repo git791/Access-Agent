@@ -1,3 +1,4 @@
+import { RetryAfterError } from "inngest";
 import { inngest } from "./client";
 import { crawlAndAudit } from "../lib/audit";
 import { inspectRenderedPage, verifyRenderedFix } from "../lib/visual-audit";
@@ -24,6 +25,17 @@ function previewPage(previewBase: string, sourcePage: string) {
 }
 
 const seriousOrCritical = (issue: Issue) => issue.impact === "Critical" || issue.impact === "Serious";
+
+function providerRetryDelay(message: string): number | undefined {
+  if (!/rate limit reached|tokens per (minute|day)|quota/i.test(message)) return undefined;
+  const match = message.match(/try again in (?:(\d+)m)?([\d.]+)s/i);
+  if (!match) return undefined;
+  const minutes = Number(match[1] ?? 0);
+  const seconds = Number(match[2]);
+  if (!Number.isFinite(seconds)) return undefined;
+  // A small buffer prevents a retry at the exact edge of the provider window.
+  return Math.max((minutes * 60 + seconds + 5) * 1_000, 15_000);
+}
 
 export const auditWorkflow = inngest.createFunction(
   { id: "audit-patch-verify", retries: 2 },
@@ -85,6 +97,11 @@ export const auditWorkflow = inngest.createFunction(
       return { pages: pages.length, issueCount: candidates.length, verified: verified.length, pullRequest: pullRequest.data.html_url };
     } catch (error) {
       const message = error instanceof Error ? error.message : "The audit failed unexpectedly.";
+      const retryDelay = providerRetryDelay(message);
+      if (retryDelay) {
+        await updateRun(data.runId, { status: "queued", message: "AI provider rate limit reached. The audit will retry automatically after its quota window resets." });
+        throw new RetryAfterError("AI provider rate limit reached; retry scheduled after the provider reset window.", retryDelay, { cause: error });
+      }
       await updateRun(data.runId, { status: "failed", message });
       await alertRunFailure(data.runId, message).catch(() => undefined);
       throw error;

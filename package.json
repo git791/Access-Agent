@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@axe-core/playwright": "^4.10.2",
+    "@google/genai": "^2.12.0",
     "@playwright/test": "^1.51.1",
     "@sparticuz/chromium": "^149.0.0",
     "@supabase/ssr": "^0.12.3",

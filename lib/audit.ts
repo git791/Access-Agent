@@ -68,7 +68,7 @@ async function launchAuditBrowser() {
 
 export async function crawlAndAudit(targetUrl: string, maxPages = 5, maxDepth = 2): Promise<PageAudit[]> {
   const origin = new URL(targetUrl).origin;
-  const groqFallback = process.env.ACCESSAGENT_AI_PROVIDER === "groq";
+  const geminiTestProvider = process.env.ACCESSAGENT_AI_PROVIDER === "gemini";
   const browser = await launchAuditBrowser();
   const seen = new Set<string>();
   const queue = [{ url: targetUrl, depth: 0 }];
@@ -78,11 +78,11 @@ export async function crawlAndAudit(targetUrl: string, maxPages = 5, maxDepth = 
       const { url, depth } = queue.shift()!;
       if (seen.has(url)) continue;
       seen.add(url);
-      // Groq proof-tier requests need bounded image bodies. Production/OpenAI
+      // Gemini test-provider requests use bounded image bodies. Production/OpenAI
       // keeps the larger full-page evidence capture below.
-      const page = await browser.newPage({ viewport: groqFallback ? { width: 1024, height: 768 } : { width: 1440, height: 960 } });
+      const page = await browser.newPage({ viewport: geminiTestProvider ? { width: 1024, height: 768 } : { width: 1440, height: 960 } });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
-      const screenshot = await page.screenshot({ fullPage: !groqFallback, type: "png" });
+      const screenshot = await page.screenshot({ fullPage: !geminiTestProvider, type: "png" });
       // Pin the browser payload independently of the helper package. The color
       // parser in axe's injected bundle currently crashes in Vercel Chromium.
       // Legacy mode still covers the rendered top-level page.
