@@ -5,11 +5,21 @@ import { required } from "./config";
 export type AiProvider = "openai" | "gemini";
 export type AiRole = "vision" | "patch";
 
+// A proof audit must fail visibly rather than pin an Inngest run indefinitely.
+const PROVIDER_TIMEOUT_MS = 75_000;
+
 type VisionRequest = {
   prompt: string;
   screenshots: Buffer[];
   schema: Record<string, unknown>;
 };
+
+const patchDiffSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["diff"],
+  properties: { diff: { type: "string" } }
+} as const;
 
 /** OpenAI is the production default. Gemini is an explicit, isolated proof provider. */
 export function aiProvider(): AiProvider {
@@ -19,7 +29,7 @@ export function aiProvider(): AiProvider {
 }
 
 function openAiClient() {
-  return new OpenAI({ apiKey: required("OPENAI_API_KEY") });
+  return new OpenAI({ apiKey: required("OPENAI_API_KEY"), timeout: PROVIDER_TIMEOUT_MS, maxRetries: 1 });
 }
 
 function geminiClient() {
@@ -51,12 +61,38 @@ export async function generateText(prompt: string, role: AiRole): Promise<string
       input: prompt,
       store: false,
       generation_config: { max_output_tokens: 4_000 }
-    });
+    }, { timeout_ms: PROVIDER_TIMEOUT_MS });
     return response.output_text ?? "";
   }
 
   const response = await openAiClient().responses.create({ model: modelFor(role), input: prompt });
   return response.output_text;
+}
+
+/** Returns a machine-extracted unified diff, never conversational prose. */
+export async function generatePatchDiff(prompt: string): Promise<string> {
+  let output: string;
+  if (aiProvider() === "gemini") {
+    const response = await geminiClient().interactions.create({
+      model: modelFor("patch"),
+      input: prompt,
+      store: false,
+      response_format: { type: "text", mime_type: "application/json", schema: patchDiffSchema },
+      generation_config: { max_output_tokens: 6_000 }
+    }, { timeout_ms: PROVIDER_TIMEOUT_MS });
+    output = response.output_text ?? "";
+  } else {
+    const response = await openAiClient().responses.create({
+      model: modelFor("patch"),
+      input: prompt,
+      text: { format: { type: "json_schema", name: "patch_diff", strict: true, schema: patchDiffSchema } }
+    });
+    output = response.output_text;
+  }
+
+  const parsed = JSON.parse(output) as { diff?: unknown };
+  if (typeof parsed.diff !== "string") throw new Error("Patch role did not return a diff field.");
+  return parsed.diff.trim();
 }
 
 /**
@@ -78,7 +114,7 @@ export async function generateVisionJson({ prompt, screenshots, schema }: Vision
       store: false,
       response_format: { type: "text", mime_type: "application/json", schema },
       generation_config: { max_output_tokens: 2_000 }
-    });
+    }, { timeout_ms: PROVIDER_TIMEOUT_MS });
     return response.output_text ?? "";
   }
 
