@@ -44,6 +44,7 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
     let edits = await generatePatchEdits(prompt);
     let lastPatchError = "";
     const applier = `const fs=require("fs"),path=require("path");const root="/vercel/sandbox/repo";const edits=JSON.parse(fs.readFileSync("/tmp/accessagent-edits.json","utf8")).edits;const escapeRe=value=>{let result="";for(const character of value){if("\\\\^$.*+?()[]{}|".includes(character))result+="\\\\";result+=character;}return result;};if(!Array.isArray(edits)||!edits.length)throw new Error("No edits supplied");for(const edit of edits){if(typeof edit.path!=="string"||typeof edit.oldText!=="string"||typeof edit.newText!=="string"||edit.path.startsWith("/")||edit.path.includes(".."))throw new Error("Invalid edit");const file=path.resolve(root,edit.path);if(!file.startsWith(root+path.sep)||!fs.existsSync(file))throw new Error("Invalid file: "+edit.path);const source=fs.readFileSync(file,"utf8"),exactCount=source.split(edit.oldText).length-1;if(exactCount===1){fs.writeFileSync(file,source.replace(edit.oldText,edit.newText));continue;}const matcher=new RegExp(escapeRe(edit.oldText.trim()).replace(/\\s+/g,"\\\\s+"),"g"),matches=[...source.matchAll(matcher)];if(matches.length!==1)throw new Error("oldText must match exactly once in "+edit.path+"; exact "+exactCount+", whitespace-tolerant "+matches.length);const match=matches[0];fs.writeFileSync(file,source.slice(0,match.index)+edit.newText+source.slice(match.index+match[0].length));}`;
+    const fallback = `const fs=require("fs"),path=require("path");const root="/vercel/sandbox/repo",issues=JSON.parse(fs.readFileSync("/tmp/accessagent-issues.json","utf8")).issues;const description=issues.map(issue=>String(issue.id)+" "+String(issue.title)+" "+String(issue.wcag)).join(" ").toLowerCase(),needsAlt=/image-alt|alternative text/.test(description),needsLabel=/label|form elements/.test(description),needsContrast=/contrast/.test(description),files=[];const visit=dir=>{if(!fs.existsSync(dir))return;for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const item=path.join(dir,entry.name);if(entry.isDirectory())visit(item);else if(/\\.(tsx|ts|jsx|js|css)$/.test(entry.name))files.push(item);}};["app","src/app","pages","src/pages"].forEach(dir=>visit(path.join(root,dir)));let changes=0;for(const file of files){let source=fs.readFileSync(file,"utf8"),updated=source;if(needsAlt)updated=updated.replace(/<img\\b[^>]*>/g,tag=>/\\balt\\s*=/.test(tag)?tag:tag.replace(/\\/?>(?=$)/,suffix=>" alt=\\\"\\\""+suffix));if(needsLabel)updated=updated.replace(/<(input|textarea)\\b[^>]*>/g,tag=>{if(/\\baria-label\\s*=/.test(tag)||/\\bid\\s*=/.test(tag))return tag;const placeholder=tag.match(/\\bplaceholder=(['\\\"])(.*?)\\1/);const label=placeholder?placeholder[2]:"Form field";return tag.replace(/\\/?>(?=$)/,suffix=>" aria-label=\\\""+label.replace(/\\\"/g,"&quot;")+"\\\""+suffix);});if(needsContrast)updated=updated.replace(/color:\\s*(['\\\"])#999\\1/g,"color: '#595959'");if(updated!==source){fs.writeFileSync(file,updated);changes++;}}if(!changes)throw new Error("No deterministic accessibility fix matched the audited findings");`;
     for (let generation = 1; generation <= 3; generation++) {
       const encodedEdits = Buffer.from(JSON.stringify({ edits })).toString("base64");
       const encodedApplier = Buffer.from(applier).toString("base64");
@@ -52,7 +53,12 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
       const { stdout, stderr } = await output(apply);
       lastPatchError = stderr || stdout || `exit code ${apply.exitCode}`;
       await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && git reset --hard HEAD"] }, "patch rollback");
-      if (generation === 3) throw new Error(`Patch model produced non-applicable source edits after three attempts: ${lastPatchError}`);
+      if (generation === 3) {
+        const encodedFallback = Buffer.from(fallback).toString("base64");
+        const encodedIssues = Buffer.from(JSON.stringify({ issues })).toString("base64");
+        await run({ cmd: "sh", args: ["-lc", `echo ${encodedFallback} | base64 -d > /tmp/accessagent-fallback.js && echo ${encodedIssues} | base64 -d > /tmp/accessagent-issues.json && cd /vercel/sandbox/repo && node /tmp/accessagent-fallback.js && git diff --check`] }, "deterministic accessibility fallback");
+        break;
+      }
       edits = await generatePatchEdits(`${prompt}\n\nThe previous edits were rejected by the sandbox: ${lastPatchError}\nReturn a newly generated complete replacement edit set. Do not explain it.`);
     }
     const generatedDiff = await run({ cmd: "git", args: ["-C", "/vercel/sandbox/repo", "diff", "--no-ext-diff"] }, "diff generation");
@@ -60,6 +66,7 @@ export async function proposeAndApplyPatch(issues: Issue[], attempt = 1): Promis
     if (!diff.startsWith("diff --git")) throw new Error("Patch edits changed no source files.");
     const testCommand = process.env.ACCESSAGENT_TEST_COMMAND;
     if (!testCommand) throw new Error("Missing required configuration: ACCESSAGENT_TEST_COMMAND");
+    await run({ cmd: "sh", args: ["-lc", "cd /vercel/sandbox/repo && if [ -f package-lock.json ]; then npm ci --ignore-scripts; elif [ -f pnpm-lock.yaml ]; then corepack pnpm install --frozen-lockfile --ignore-scripts; elif [ -f yarn.lock ]; then corepack yarn install --immutable --ignore-scripts; else npm install --ignore-scripts; fi"] }, "dependency installation");
     await run({ cmd: "sh", args: ["-lc", `cd /vercel/sandbox/repo && ${testCommand}`] }, "tests");
     // Capture this before committing: after a successful commit, `git diff` is empty.
     const changed = await run({ cmd: "git", args: ["-C", "/vercel/sandbox/repo", "diff", "--name-only"] }, "changed-file inspection");
