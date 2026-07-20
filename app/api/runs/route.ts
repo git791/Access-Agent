@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runtimeConfiguration } from "../../../lib/config";
+import { ingressConfiguration } from "../../../lib/config";
 import { inngest } from "../../../inngest/client";
 import { createRun } from "../../../lib/store";
 import { assertAuditableUrl } from "../../../lib/url-security";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (typeof targetUrl !== "string") return NextResponse.json({ error: "A preview URL is required." }, { status: 400 });
   try { await assertAuditableUrl(targetUrl); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Enter a valid authorized preview URL." }, { status: 400 }); }
 
-  const configuration = runtimeConfiguration();
+  const configuration = ingressConfiguration();
   if (!configuration.ready) return NextResponse.json({ error: `Live audits are unavailable until configuration is complete: ${configuration.missing.join(", ")}.` }, { status: 503 });
   const user = await authenticatedUser(request);
   if (process.env.ACCESSAGENT_REQUIRE_AUTH === "true" && !user) return NextResponse.json({ error: "Sign in with GitHub before starting an audit." }, { status: 401 });

@@ -10,3 +10,10 @@ export function runtimeConfiguration() {
     .filter((name) => !process.env[name]);
   return { ready: missing.length === 0, missing };
 }
+
+/** Vercel only creates the run and sends its event; Render owns AI and signed workflow execution. */
+export function ingressConfiguration() {
+  const missing = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY", "INNGEST_EVENT_KEY"]
+    .filter((name) => !process.env[name]);
+  return { ready: missing.length === 0, missing };
+}
