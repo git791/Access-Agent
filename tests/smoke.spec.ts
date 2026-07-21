@@ -4,6 +4,8 @@ test("dashboard shows an empty evidence workspace before a run", async ({ page }
   await page.goto("/");
   await expect(page.getByText("Evidence and findings will appear here")).toBeVisible();
   await expect(page.getByText("How verification works")).toBeVisible();
+  await expect(page.getByLabel("Public preview URL")).toHaveValue("https://access-agent-sable.vercel.app/demo-target");
+  await expect(page.getByText("SAFE BRANCH")).toBeVisible();
 });
 
 test("controlled demo target exposes seeded accessibility defects", async ({ page }) => {
