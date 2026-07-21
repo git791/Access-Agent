@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("dashboard does not display fabricated findings before a run", async ({ page }) => {
+test("dashboard shows an empty evidence workspace before a run", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("No findings yet")).toBeVisible();
-  await expect(page.getByText("Verified is reserved for a completed re-render and verification verdict.")).toBeVisible();
+  await expect(page.getByText("Evidence and findings will appear here")).toBeVisible();
+  await expect(page.getByText("How verification works")).toBeVisible();
 });
 
 test("controlled demo target exposes seeded accessibility defects", async ({ page }) => {
