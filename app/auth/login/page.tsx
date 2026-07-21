@@ -10,5 +10,5 @@ export default function LoginPage() {
     const { error } = await client.auth.signInWithOAuth({ provider: "github", options: { redirectTo: `${window.location.origin}/auth/callback` } });
     if (error) setMessage(error.message);
   }
-  return <main style={{ maxWidth: 560, margin: "10vh auto", padding: 24 }}><p className="eyebrow">ACCESSAGENT ACCOUNT</p><h1>Sign in with GitHub</h1><p className="lede">Connect your identity before starting an accessibility remediation run.</p><button onClick={signIn}>Continue with GitHub</button>{message ? <p role="alert">{message}</p> : null}</main>;
+  return <main style={{ maxWidth: 560, margin: "10vh auto", padding: 24 }}><p className="eyebrow">PRGATE ACCOUNT</p><h1>Sign in with GitHub</h1><p className="lede">Connect your identity before starting an accessibility remediation run.</p><button onClick={signIn}>Continue with GitHub</button>{message ? <p role="alert">{message}</p> : null}</main>;
 }
