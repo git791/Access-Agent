@@ -24,6 +24,18 @@ It is deliberately more than an accessibility scanner. A scanner can report a br
 
 The controlled `/demo-target` is intentionally inaccessible so that the full loop can be demonstrated safely. It is not an implementation example.
 
+## How Codex and GPT-5.6 are used
+
+### Codex + GPT-5.6 Terra: the development and verification environment
+
+Codex, using GPT-5.6 Terra for this build, was used to turn the product specification into this working system: it inspected the repository, implemented the Next.js, Supabase, Inngest, browser-audit, sandbox, and GitHub integrations; ran type/unit checks; reviewed diffs; and iterated on deployment and runtime failures. That mirrors the core product thesis: make a source change, run real checks, and inspect the outcome rather than trusting an untested edit.
+
+### GPT-5.6: the intended high-capability reasoning and visual-review model
+
+AccessAgent's runtime calls the OpenAI Responses API for three bounded tasks: visual accessibility inspection, source-edit proposal, and post-preview verification. When an OpenAI project provides a GPT-5.6 model identifier, set `OPENAI_VISION_MODEL` and `OPENAI_PATCH_MODEL` to that identifier to use it for those roles. Playwright—not the model—controls the browser, captures screenshots, and runs axe-core; the model receives the resulting evidence and must return schema-validated structured output.
+
+The committed default is currently `gpt-5-mini` to keep a hackathon proof affordable. This is intentional model tiering, not a claim that every run used GPT-5.6. The workflow, evidence gates, sandbox, and verification behavior stay the same when the configured OpenAI model changes.
+
 ## The idea in one minute
 
 ```text
