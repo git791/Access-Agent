@@ -1,6 +1,6 @@
-# AccessAgent
+# PRGate
 
-**A closed-loop accessibility remediation agent.** AccessAgent audits a rendered website, proposes source-level fixes in an isolated environment, re-renders the changed preview, and only opens a pull request when the recorded evidence verifies the fixes.
+**A closed-loop accessibility remediation agent.** PRGate audits a rendered website, proposes source-level fixes in an isolated environment, re-renders the changed preview, and only opens a pull request when the recorded evidence verifies the fixes.
 
 It is deliberately more than an accessibility scanner. A scanner can report a broken image alternative or unlabeled form field; AccessAgent carries that finding through a real browser audit, a disposable code branch, a test run, a deployment preview, and a second browser inspection before it makes a verification claim.
 
@@ -11,11 +11,11 @@ It is deliberately more than an accessibility scanner. A scanner can report a br
 
 ## What is implemented
 
-| Capability | What AccessAgent does |
+| Capability | What PRGate does |
 | --- | --- |
 | Rendered audit | Crawls an authorized same-origin site within page/depth limits, captures screenshots and an accessibility-tree snapshot, and runs axe-core. |
 | Visual review | Sends screenshot, accessibility context, and static findings through a structured AI-provider contract to identify visual barriers such as insufficient contrast. |
-| Safe source changes | Clones the configured repository into Vercel Sandbox, works only on a new `accessagent/run-*` branch, and never writes to `main`. |
+| Safe source changes | Clones the configured repository into Vercel Sandbox, works only on a new `PRGate/run-*` branch, and never writes to `main`. |
 | Test + preview gate | Runs the configured repository test command, pushes the temporary branch, then waits for its Vercel Preview Deployment. |
 | Verification | Re-audits the preview, compares before/after screenshots, stores evidence, and labels each original finding as verified or needing review. |
 | Pull request | Opens one GitHub PR only when every patch in the batch verifies; the branch includes the evidence files. |
@@ -32,7 +32,7 @@ Codex, using GPT-5.6 Terra for this build, was used to turn the product specific
 
 ### GPT-5.6: the intended high-capability reasoning and visual-review model
 
-AccessAgent's runtime calls the OpenAI Responses API for three bounded tasks: visual accessibility inspection, source-edit proposal, and post-preview verification. When an OpenAI project provides a GPT-5.6 model identifier, set `OPENAI_VISION_MODEL` and `OPENAI_PATCH_MODEL` to that identifier to use it for those roles. Playwright—not the model—controls the browser, captures screenshots, and runs axe-core; the model receives the resulting evidence and must return schema-validated structured output.
+PRGate's runtime calls the OpenAI Responses API for three bounded tasks: visual accessibility inspection, source-edit proposal, and post-preview verification. When an OpenAI project provides a GPT-5.6 model identifier, set `OPENAI_VISION_MODEL` and `OPENAI_PATCH_MODEL` to that identifier to use it for those roles. Playwright—not the model—controls the browser, captures screenshots, and runs axe-core; the model receives the resulting evidence and must return schema-validated structured output.
 
 The committed default is currently `gpt-5-mini` to keep a hackathon proof affordable. This is intentional model tiering, not a claim that every run used GPT-5.6. The workflow, evidence gates, sandbox, and verification behavior stay the same when the configured OpenAI model changes.
 
@@ -64,7 +64,7 @@ The central product rule is simple: **a diff is not proof**. A finding is only m
 
 ```mermaid
 flowchart LR
-  U[Developer in AccessAgent dashboard] --> V[Vercel: Next.js dashboard and run API]
+  U[Developer in PRGate dashboard] --> V[Vercel: Next.js dashboard and run API]
   V --> S[(Supabase: runs, findings, events, evidence)]
   V --> E[Inngest event API]
   E --> R[Render: Docker worker /api/inngest]
@@ -104,7 +104,7 @@ Vercel needs `INNGEST_EVENT_KEY` to send events. Render needs both `INNGEST_EVEN
 
 The frontend is Next.js 15 and React 19. It renders the run trace, evidence, findings, patch attempts, before/after pairs, and rescan controls. The design uses a high-contrast ink/paper palette and ratio chips because the product interface should meet the standard it asks other sites to meet.
 
-When a user starts an audit, `POST /api/runs` validates that the target is an authorized, safe public URL; applies the per-hour audit limit; creates a queued Supabase run; and sends `accessagent/audit.requested` to Inngest. If `ACCESSAGENT_REQUIRE_AUTH=true`, GitHub OAuth through Supabase is required before the run can start.
+When a user starts an audit, `POST /api/runs` validates that the target is an authorized, safe public URL; applies the per-hour audit limit; creates a queued Supabase run; and sends `PRGate/audit.requested` to Inngest. If `ACCESSAGENT_REQUIRE_AUTH=true`, GitHub OAuth through Supabase is required before the run can start.
 
 This Vercel ingress route intentionally checks only its own needs: Supabase and the Inngest event key. It does not need an AI key or an Inngest signing key.
 
@@ -156,7 +156,7 @@ The provider never receives authority to write directly into the repository. Its
 The patch stage starts a Vercel Sandbox, clones `ACCESSAGENT_REPO_URL`, and creates a fresh branch named like:
 
 ```text
-accessagent/run-<timestamp>-attempt-<n>
+PRGate/run-<timestamp>-attempt-<n>
 ```
 
 It inventories the relevant project files, asks the patch role for bounded edits, then accepts an edit only when it targets a permitted relative file and its old text matches once. It also runs `git diff --check` and the human-configured `ACCESSAGENT_TEST_COMMAND` before it commits and pushes.
@@ -165,7 +165,7 @@ For the controlled high-frequency findings, there is a narrowly scoped determini
 
 ### 7. Preview and verification
 
-Once the temporary branch is pushed, AccessAgent asks Vercel for the branch preview and waits for it to become ready. It then repeats the browser audit against that preview.
+Once the temporary branch is pushed, PRGate asks Vercel for the branch preview and waits for it to become ready. It then repeats the browser audit against that preview.
 
 Verification does not trust a model response alone:
 
@@ -176,9 +176,9 @@ If an original issue has disappeared from the fresh relevant audit and no regres
 
 ### 8. Evidence and pull request
 
-Supabase persists runs, findings, patch attempts, run events, rescan records, and screenshot references. When all fixes verify and `ACCESSAGENT_PUBLISH_PR_EVIDENCE=true`, the PR stage commits the before/after evidence into `.accessagent/evidence/<run-id>/` on the temporary branch and opens one GitHub PR to `GITHUB_BASE_BRANCH` (normally `main`).
+Supabase persists runs, findings, patch attempts, run events, rescan records, and screenshot references. When all fixes verify and `ACCESSAGENT_PUBLISH_PR_EVIDENCE=true`, the PR stage commits the before/after evidence into `.PRGate/evidence/<run-id>/` on the temporary branch and opens one GitHub PR to `GITHUB_BASE_BRANCH` (normally `main`).
 
-AccessAgent never pushes to `main`, never auto-merges, and never opens a PR containing unverified findings.
+PRGate never pushes to `main`, never auto-merges, and never opens a PR containing unverified findings.
 
 ## Technology stack
 
@@ -277,7 +277,7 @@ Create a fine-grained GitHub token scoped to the target repository with:
 - Contents: Read and write
 - Pull requests: Read and write
 
-Set `ACCESSAGENT_REPO_URL` to the clone URL of that repository. AccessAgent creates temporary `accessagent/run-*` branches, pushes them, and opens PRs to `GITHUB_BASE_BRANCH`. After reviewing the result, keep the branch backing an open PR and delete stale failed/abandoned `accessagent/run-*` branches from GitHub.
+Set `ACCESSAGENT_REPO_URL` to the clone URL of that repository. PRGate creates temporary `PRGate/run-*` branches, pushes them, and opens PRs to `GITHUB_BASE_BRANCH`. After reviewing the result, keep the branch backing an open PR and delete stale failed/abandoned `PRGate/run-*` branches from GitHub.
 
 ### Inngest setup
 
@@ -343,7 +343,7 @@ For a bounded proof run, use `ACCESSAGENT_MAX_PAGES=1` and `ACCESSAGENT_MAX_DEPT
 
 ## Scope and roadmap
 
-AccessAgent is designed for web accessibility remediation and does not claim legal certification or complete WCAG AAA coverage. The next practical improvements are broader interactive keyboard/focus testing, richer issue-to-source mapping, team/organization controls, configurable policy gates, and more production observability/cost controls.
+PRGate is designed for web accessibility remediation and does not claim legal certification or complete WCAG AAA coverage. The next practical improvements are broader interactive keyboard/focus testing, richer issue-to-source mapping, team/organization controls, configurable policy gates, and more production observability/cost controls.
 
 ## License
 
