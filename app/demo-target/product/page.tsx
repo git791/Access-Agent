@@ -6,10 +6,10 @@ export default function DemoProduct() {
     <DemoNav />
     <p style={{ color: "#aaa", background: "#fff" }}>Limited release</p>
     <h1>Field jacket</h1>
-    <img src="/demo-product.svg" />
+    <img src="/demo-product.svg"  alt=""/>
     <p>A weather-resistant layer built for everyday movement.</p>
-    <input type="number" defaultValue="1" min="1" />
+    <input type="number" defaultValue="1" min="1"  aria-label="Form field"/>
     <button style={{ background: "#9f8c73", color: "#fff", border: 0, padding: 12 }}>Add to basket</button>
-    <section><h2>Delivery preference</h2><input type="radio" name="delivery" /> Standard <input type="radio" name="delivery" /> Express</section>
+    <section><h2>Delivery preference</h2><input type="radio" name="delivery"  aria-label="Form field"/> Standard <input type="radio" name="delivery"  aria-label="Form field"/> Express</section>
   </main>;
 }
