@@ -1,4 +1,4 @@
-# PRGate
+# Access-Agent
 
 **A closed-loop accessibility remediation agent.** PRGate audits a rendered website, proposes source-level fixes in an isolated environment, re-renders the changed preview, and only opens a pull request when the recorded evidence verifies the fixes.
 
